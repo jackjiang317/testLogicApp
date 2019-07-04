@@ -24,7 +24,7 @@ pipeline {
 
           dir('LogicApps/creationResourceGroup'){
             sh 'az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID'
-            sh 'az group deployment create --name testLogicAppDeployment --resource-group testLogicAppJenkins --template-file jenkins_test.json'
+            sh 'az group deployment create --name testLogicAppDeployment --resource-group testLogicAppJenkins --template-file template.json'
           }
       }
     }
