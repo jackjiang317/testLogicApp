@@ -18,11 +18,261 @@
                 "state": "Enabled",
                 "definition": {
                     "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "actions": {
+                        "Extract_Subscription_Id_Found": {
+                            "inputs": {
+                                "content": "@body('findSubscriptionId_2')",
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "runAfter": {
+                                "findSubscriptionId_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ParseJson"
+                        },
+                        "Get_Azure_Subcriptions_from_CCR": {
+                            "inputs": {
+                                "headers": {
+                                    "x-api-key": "@{parameters('ccrApiKey')}"
+                                },
+                                "method": "GET",
+                                "uri": "https://cai0yrx6k9.execute-api.ap-southeast-2.amazonaws.com/prod/ccr_accounts/account_allocation/*?domain=azure"
+                            },
+                            "runAfter": {},
+                            "type": "Http"
+                        },
+                        "If_subscription_id_success": {
+                            "actions": {
+                                "Extract_Resource_Group_Success": {
+                                    "inputs": {
+                                        "content": "@body('createResourceGroup')",
+                                        "schema": {
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "createResourceGroup": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson"
+                                },
+                                "Extract_Subscription_Details": {
+                                    "inputs": {
+                                        "content": "@body('findSubscriptionId_2')",
+                                        "schema": {
+                                            "properties": {
+                                                "accountContact": {
+                                                    "type": "string"
+                                                },
+                                                "accountType": {
+                                                    "type": "string"
+                                                },
+                                                "agencyName": {
+                                                    "type": "string"
+                                                },
+                                                "output": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Respond_success": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson"
+                                },
+                                "If_resource_group_success": {
+                                    "actions": {
+                                        "Send_an_email": {
+                                            "inputs": {
+                                                "body": {
+                                                    "Body": "Resource Group: @{triggerBody()?['application_name']}-@{body('Extract_Subscription_Details')?['accountType']}-rg\n\n",
+                                                    "Subject": "Resource Group Creation Success: @{triggerBody()?['application_name']}",
+                                                    "To": "@{triggerBody()?['requestor']};@{body('Extract_Subscription_Details')?['accountContact']}"
+                                                },
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['office365']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "post",
+                                                "path": "/Mail"
+                                            },
+                                            "runAfter": {},
+                                            "type": "ApiConnection"
+                                        }
+                                    },
+                                    "else": {
+                                        "actions": {
+                                            "Send_email_failed": {
+                                                "inputs": {
+                                                    "body": {
+                                                        "Body": "Resource group creation failed for @{triggerBody()?['application_name']}-@{body('Extract_Subscription_Details')?['accountType']}-rg\n\n",
+                                                        "Subject": "Resource Group Creation Failed: @{triggerBody()?['application_name']}",
+                                                        "To": "@triggerBody()?['requestor']"
+                                                    },
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['office365']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "post",
+                                                    "path": "/Mail"
+                                                },
+                                                "runAfter": {},
+                                                "type": "ApiConnection"
+                                            }
+                                        }
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@body('Extract_Resource_Group_Success')?['success']",
+                                                    true
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "runAfter": {
+                                        "Extract_Resource_Group_Success": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "If"
+                                },
+                                "Respond_success": {
+                                    "inputs": {
+                                        "body": {
+                                            "output": "Resource Group creation in progress in background. You will recieve an email when complete.",
+                                            "success": true
+                                        },
+                                        "statusCode": 200
+                                    },
+                                    "kind": "Http",
+                                    "runAfter": {},
+                                    "type": "Response"
+                                },
+                                "createResourceGroup": {
+                                    "inputs": {
+                                        "body": {
+                                            "name": "@{triggerBody()?['application_name']}-@{body('Extract_Subscription_Details')?['accountType']}-rg",
+                                            "subscription_id": "@{body('Extract_Subscription_Details')?['output']}"
+                                        },
+                                        "function": {
+                                            "id": "/subscriptions/e00232ca-ea17-4e69-89cb-280182741ef1/resourceGroups/tfnsw-ccoe-foundational-services-dev/providers/Microsoft.Web/sites/tfnsw-ccoe-workspace-automation-dev/functions/createResourceGroup"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Extract_Subscription_Details": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function"
+                                }
+                            },
+                            "else": {
+                                "actions": {
+                                    "Respond_failed": {
+                                        "inputs": {
+                                            "body": {
+                                                "output": "Resource Group creation failed. Unable to find subscription",
+                                                "success": false
+                                            },
+                                            "statusCode": 404
+                                        },
+                                        "kind": "Http",
+                                        "runAfter": {},
+                                        "type": "Response"
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "equals": [
+                                            "@body('Extract_Subscription_Id_Found')?['success']",
+                                            true
+                                        ]
+                                    }
+                                ]
+                            },
+                            "runAfter": {
+                                "Extract_Subscription_Id_Found": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "If"
+                        },
+                        "findSubscriptionId_2": {
+                            "inputs": {
+                                "body": {
+                                    "subscription_body": "@body('Get_Azure_Subcriptions_from_CCR')",
+                                    "subscription_name": "@{triggerBody()?['subscription_name']}"
+                                },
+                                "function": {
+                                    "id": "/subscriptions/e00232ca-ea17-4e69-89cb-280182741ef1/resourceGroups/tfnsw-ccoe-foundational-services-dev/providers/Microsoft.Web/sites/tfnsw-ccoe-workspace-automation-dev/functions/findSubscriptionId"
+                                }
+                            },
+                            "runAfter": {
+                                "Get_Azure_Subcriptions_from_CCR": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Function"
+                        }
+                    },
                     "contentVersion": "1.0.0.0",
-                    "parameters": {},
-                    "triggers": {},
-                    "actions": {},
-                    "outputs": {}
+                    "outputs": {},
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        },
+                        "ccrApiKey": {
+                            "defaultValue": "CCRAPIKEY",
+                            "type": "String"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "application_name": {
+                                            "type": "string"
+                                        },
+                                        "requestor": {
+                                            "type": "string"
+                                        },
+                                        "subscription_name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "kind": "Http",
+                            "type": "Request"
+                        }
+                    }
                 },
                 "parameters": {}
             }
