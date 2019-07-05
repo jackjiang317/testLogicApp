@@ -17,17 +17,16 @@ pipeline {
           sh 'rm -fr *'
           
             git(
-               url: 'https://TfNSWAnyCloud@dev.azure.com/TfNSWAnyCloud/AnyCloud_Foundation/_git/AnyCloud_Foundation',
-               credentialsId: 'AzureDevOpsCredentialHttps',
-               branch: "jenkins_test"
+               url: 'https://github.com/jackjiang317/testLogicApp.git',
+               branch: "master"
             )
 
           dir('LogicApps/creationResourceGroup'){
             sh 'az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID'
             sh 'az group deployment create --name testLogicAppDeployment --resource-group testGroupName --template-file jenkins_test.json'
           }
+        }
       }
     }
   }
-}
 }
